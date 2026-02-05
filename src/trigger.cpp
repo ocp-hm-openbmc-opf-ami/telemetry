@@ -24,8 +24,10 @@ Trigger::Trigger(
     const interfaces::TriggerFactory& triggerFactory, Sensors sensorsIn) :
     id(std::move(idIn)),
     path(utils::pathAppend(utils::constants::triggerDirPath, *id)),
-    name(nameIn), triggerActions(std::move(triggerActionsIn)),
-    reportIds(std::move(reportIdsIn)), thresholds(std::move(thresholdsIn)),
+    name(nameIn), triggerActions(triggerActionsIn),
+    reportIds(reportIdsIn ? reportIdsIn
+                         : std::make_shared<std::vector<std::string>>()),
+    thresholds(std::move(thresholdsIn)),
     fileName(std::to_string(std::hash<std::string>{}(*id))),
     triggerStorage(triggerStorageIn), sensors(std::move(sensorsIn)),
     messanger(ioc)
@@ -46,7 +48,8 @@ Trigger::Trigger(
         });
 
     triggerIface = objServer->add_unique_interface(
-        path, triggerIfaceName, [this, &triggerFactory](auto& dbusIface) {
+        path, triggerIfaceName,
+        [this, triggerFactoryPtr = &triggerFactory](auto& dbusIface) {
             persistent = storeConfiguration();
             dbusIface.register_property_rw(
                 "Persistent", persistent,
@@ -72,16 +75,16 @@ Trigger::Trigger(
             dbusIface.register_property_rw(
                 "DiscreteThresholds", std::vector<discrete::ThresholdParam>{},
                 sdbusplus::vtable::property_::emits_change,
-                [this, &triggerFactory](
+                  [this, triggerFactoryPtr](
                     const std::vector<discrete::ThresholdParam>& newVal,
                     std::vector<discrete::ThresholdParam>& oldVal) {
                     LabeledTriggerThresholdParams newThresholdParams =
                         utils::ToLabeledThresholdParamConversion()(newVal);
                     TriggerManager::verifyThresholdParams(newThresholdParams);
-                    triggerFactory.updateThresholds(
+                    triggerFactoryPtr->updateThresholds(
                         thresholds, *id, triggerActions, reportIds, sensors,
                         newThresholdParams);
-                    oldVal = std::move(newVal);
+                    oldVal = newVal;
                     return 1;
                 },
                 [this](const auto&) {
@@ -101,16 +104,16 @@ Trigger::Trigger(
             dbusIface.register_property_rw(
                 "NumericThresholds", std::vector<numeric::ThresholdParam>{},
                 sdbusplus::vtable::property_::emits_change,
-                [this, &triggerFactory](
+                  [this, triggerFactoryPtr](
                     const std::vector<numeric::ThresholdParam>& newVal,
                     std::vector<numeric::ThresholdParam>& oldVal) {
                     LabeledTriggerThresholdParams newThresholdParams =
                         utils::ToLabeledThresholdParamConversion()(newVal);
                     TriggerManager::verifyThresholdParams(newThresholdParams);
-                    triggerFactory.updateThresholds(
+                    triggerFactoryPtr->updateThresholds(
                         thresholds, *id, triggerActions, reportIds, sensors,
                         newThresholdParams);
-                    oldVal = std::move(newVal);
+                    oldVal = newVal;
                     return 1;
                 },
                 [this](const auto&) {
@@ -129,15 +132,15 @@ Trigger::Trigger(
             dbusIface.register_property_rw(
                 "Sensors", SensorsInfo{},
                 sdbusplus::vtable::property_::emits_change,
-                [this, &triggerFactory](auto newVal, auto& oldVal) {
+                  [this, triggerFactoryPtr](auto newVal, auto& oldVal) {
                     auto labeledSensorInfo =
-                        triggerFactory.getLabeledSensorsInfo(newVal);
-                    triggerFactory.updateSensors(sensors, labeledSensorInfo);
+                        triggerFactoryPtr->getLabeledSensorsInfo(newVal);
+                    triggerFactoryPtr->updateSensors(sensors, labeledSensorInfo);
                     for (const auto& threshold : thresholds)
                     {
                         threshold->updateSensors(sensors);
                     }
-                    oldVal = std::move(newVal);
+                    oldVal = newVal;
                     return 1;
                 },
                 [this](const auto&) {
@@ -157,7 +160,7 @@ Trigger::Trigger(
                     *reportIds = newReportIds;
                     messanger.send(messages::TriggerPresenceChangedInd{
                         messages::Presence::Exist, *id, *reportIds});
-                    oldVal = std::move(newVal);
+                    oldVal = newVal;
                     return 1;
                 },
                 [this](const auto&) {
