@@ -26,6 +26,16 @@ constexpr const char* TriggerNumericBelowUpperCritical =
     "Telemetry.1.0.TriggerNumericBelowUpperCritical";
 constexpr const char* TriggerNumericReadingNormal =
     "Telemetry.1.0.TriggerNumericReadingNormal";
+constexpr const char* TriggerNumericWarning =
+    "xyz.openbmc_project.Logging.Entry.Level.Warning";
+constexpr const char* TriggerNumericCritical =
+    "xyz.openbmc_project.Logging.Entry.Level.Critical";
+constexpr const char* TriggerDiscreteOK =
+    "xyz.openbmc_project.Logging.Entry.Level.Informational";
+constexpr const char* TriggerDiscreteWarning =
+    "xyz.openbmc_project.Logging.Entry.Level.Warning";
+constexpr const char* TriggerDiscreteCritical =
+    "xyz.openbmc_project.Logging.Entry.Level.Critical";
 } // namespace redfish_message_ids
 
 namespace numeric
@@ -62,11 +72,18 @@ namespace discrete
 class LogToRedfishEventLog : public interfaces::TriggerAction
 {
   public:
-    explicit LogToRedfishEventLog() {}
+    explicit LogToRedfishEventLog(::discrete::Severity severity) :
+        severity(severity)
+    {}
 
     void commit(const std::string& triggerId, const ThresholdName thresholdName,
                 const std::string& sensorName, const Milliseconds timestamp,
                 const TriggerValue value) override;
+
+  private:
+    const ::discrete::Severity severity;
+
+    const char* getRedfishMessageId() const;
 };
 
 void fillActions(

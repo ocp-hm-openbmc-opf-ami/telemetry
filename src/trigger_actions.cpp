@@ -15,6 +15,19 @@
 namespace action
 {
 
+namespace
+{
+std::string timestampToString(Milliseconds timestamp)
+{
+    std::time_t t = static_cast<time_t>(
+        std::chrono::duration_cast<std::chrono::seconds>(timestamp).count());
+    std::stringstream ss;
+    ss << std::put_time(std::gmtime(&t), "%FT%T.") << std::setw(3)
+       << std::setfill('0') << timestamp.count() % 1000 << 'Z';
+    return ss.str();
+}
+} // namespace
+
 namespace numeric
 {
 
@@ -74,27 +87,24 @@ void LogToRedfishEventLog::commit(
     const TriggerValue triggerValue)
 {
     double value = std::get<double>(triggerValue);
-    auto messageId = getRedfishMessageId(value);
+    std::string thresholdName = ::numeric::typeToString(type);
+    auto direction = getDirection(value, threshold);
+    auto severity = getRedfishMessageId(value);
 
-    if (std::string_view(messageId) ==
-        redfish_message_ids::TriggerNumericReadingNormal)
-    {
-        phosphor::logging::log<phosphor::logging::level::INFO>(
-            "Logging numeric trigger action to Redfish Event Log.",
-            phosphor::logging::entry("REDFISH_MESSAGE_ID=%s", messageId),
-            phosphor::logging::entry("REDFISH_MESSAGE_ARGS=%s,%f,%s",
-                                     sensorName.c_str(), value,
-                                     triggerId.c_str()));
-    }
-    else
-    {
-        phosphor::logging::log<phosphor::logging::level::INFO>(
-            "Logging numeric trigger action to Redfish Event Log.",
-            phosphor::logging::entry("REDFISH_MESSAGE_ID=%s", messageId),
-            phosphor::logging::entry("REDFISH_MESSAGE_ARGS=%s,%f,%f,%s",
-                                     sensorName.c_str(), value, threshold,
-                                     triggerId.c_str()));
-    }
+    auto connection = sdbusplus::bus::new_default_system();
+    sdbusplus::message_t AddToLog = connection.new_method_call(
+        "xyz.openbmc_project.Logging", "/xyz/openbmc_project/logging",
+        "xyz.openbmc_project.Logging.Create", "Create");
+
+    std::string journalMsg(
+        "Numeric threshold '" + thresholdName + "' of trigger '" + triggerId +
+        "' is crossed on sensor " + sensorName +
+        ", recorded value: " + std::to_string(value) +
+        ", crossing direction: " + std::string(utils::toShortEnum(direction)) +
+        ", timestamp: " + timestampToString(timestamp));
+
+    AddToLog.append(journalMsg, severity, std::map<std::string, std::string>());
+    connection.call(AddToLog);
 }
 
 void fillActions(
@@ -129,21 +139,41 @@ void fillActions(
 namespace discrete
 {
 
+const char* LogToRedfishEventLog::getRedfishMessageId() const
+{
+    switch (severity)
+    {
+        case ::discrete::Severity::ok:
+            return redfish_message_ids::TriggerDiscreteOK;
+        case ::discrete::Severity::warning:
+            return redfish_message_ids::TriggerDiscreteWarning;
+        case ::discrete::Severity::critical:
+            return redfish_message_ids::TriggerDiscreteCritical;
+    }
+    throw std::runtime_error("Invalid severity");
+}
+
 void LogToRedfishEventLog::commit(
     const std::string& triggerId, const ThresholdName thresholdNameIn,
     const std::string& sensorName, const Milliseconds timestamp,
     const TriggerValue triggerValue)
 {
     auto value = std::get<std::string>(triggerValue);
+   auto severity = getRedfishMessageId();
 
-    phosphor::logging::log<phosphor::logging::level::INFO>(
-        "Logging discrete trigger action to Redfish Event Log.",
-        phosphor::logging::entry(
-            "REDFISH_MESSAGE_ID=%s",
-            redfish_message_ids::TriggerDiscreteConditionMet),
-        phosphor::logging::entry("REDFISH_MESSAGE_ARGS=%s,%s,%s",
-                                 sensorName.c_str(), value.c_str(),
-                                 triggerId.c_str()));
+    auto connection = sdbusplus::bus::new_default_system();
+    sdbusplus::message_t AddToLog = connection.new_method_call(
+        "xyz.openbmc_project.Logging", "/xyz/openbmc_project/logging",
+        "xyz.openbmc_project.Logging.Create", "Create");
+
+    std::string journalMsg("Discrete condition '" + thresholdNameIn->get() +
+                           "' of trigger '" + triggerId +
+                           "' is crossed on sensor " + sensorName +
+                           ", recorded value: " + value +
+                           ", timestamp: " + timestampToString(timestamp));
+
+    AddToLog.append(journalMsg, severity, std::map<std::string, std::string>());
+    connection.call(AddToLog);
 }
 
 void fillActions(
@@ -160,7 +190,7 @@ void fillActions(
             case TriggerAction::LogToRedfishEventLog:
             {
                 actionsIf.emplace_back(
-                    std::make_unique<LogToRedfishEventLog>());
+                    std::make_unique<LogToRedfishEventLog>(severity));
                 break;
             }
             case TriggerAction::UpdateReport:
@@ -182,15 +212,20 @@ void LogToRedfishEventLog::commit(
     const TriggerValue triggerValue)
 {
     auto value = triggerValueToString(triggerValue);
+    auto severity = redfish_message_ids::TriggerDiscreteOK;
 
-    phosphor::logging::log<phosphor::logging::level::INFO>(
-        "Logging onChange discrete trigger action to Redfish Event Log.",
-        phosphor::logging::entry(
-            "REDFISH_MESSAGE_ID=%s",
-            redfish_message_ids::TriggerDiscreteConditionMet),
-        phosphor::logging::entry("REDFISH_MESSAGE_ARGS=%s,%s,%s",
-                                 sensorName.c_str(), value.c_str(),
-                                 triggerId.c_str()));
+    auto connection = sdbusplus::bus::new_default_system();
+    sdbusplus::message_t AddToLog = connection.new_method_call(
+        "xyz.openbmc_project.Logging", "/xyz/openbmc_project/logging",
+        "xyz.openbmc_project.Logging.Create", "Create");
+
+    std::string journalMsg("Discrete condition OnChange of trigger '" +
+                           triggerId + "' is crossed on sensor " + sensorName +
+                           ", recorded value: " + value +
+                           ", timestamp: " + timestampToString(timestamp));
+
+    AddToLog.append(journalMsg, severity, std::map<std::string, std::string>());
+    connection.call(AddToLog);
 }
 
 void fillActions(
