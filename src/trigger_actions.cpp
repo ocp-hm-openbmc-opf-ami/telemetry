@@ -44,6 +44,21 @@ static const char* getDirection(double value, double threshold)
     throw std::runtime_error("Invalid value");
 }
 
+static const char* getDbusSeverity(::numeric::Type type)
+{
+    switch (type)
+    {
+        case ::numeric::Type::upperCritical:
+        case ::numeric::Type::lowerCritical:
+            return redfish_message_ids::TriggerNumericCritical;
+        case ::numeric::Type::upperWarning:
+        case ::numeric::Type::lowerWarning:
+            return redfish_message_ids::TriggerNumericWarning;
+        default:
+            return "xyz.openbmc_project.Logging.Entry.Level.Informational";
+    }
+}
+
 const char* LogToRedfishEventLog::getRedfishMessageId(const double value) const
 {
     std::string direction(getDirection(value, threshold));
@@ -89,7 +104,7 @@ void LogToRedfishEventLog::commit(
     double value = std::get<double>(triggerValue);
     std::string thresholdName = ::numeric::typeToString(type);
     auto direction = getDirection(value, threshold);
-    auto severity = getRedfishMessageId(value);
+    auto severity = getDbusSeverity(type);
 
     auto connection = sdbusplus::bus::new_default_system();
     sdbusplus::message_t AddToLog = connection.new_method_call(
@@ -159,18 +174,18 @@ void LogToRedfishEventLog::commit(
     const TriggerValue triggerValue)
 {
     auto value = std::get<std::string>(triggerValue);
-   auto severity = getRedfishMessageId();
+    auto severity = getRedfishMessageId();
 
     auto connection = sdbusplus::bus::new_default_system();
     sdbusplus::message_t AddToLog = connection.new_method_call(
         "xyz.openbmc_project.Logging", "/xyz/openbmc_project/logging",
         "xyz.openbmc_project.Logging.Create", "Create");
 
-    std::string journalMsg("Discrete condition '" + thresholdNameIn->get() +
-                           "' of trigger '" + triggerId +
-                           "' is crossed on sensor " + sensorName +
-                           ", recorded value: " + value +
-                           ", timestamp: " + timestampToString(timestamp));
+    std::string journalMsg(
+        "Discrete condition '" + thresholdNameIn->get() + "' of trigger '" +
+        triggerId + "' is crossed on sensor " + sensorName +
+        ", recorded value: " + value +
+        ", timestamp: " + timestampToString(timestamp));
 
     AddToLog.append(journalMsg, severity, std::map<std::string, std::string>());
     connection.call(AddToLog);
@@ -219,10 +234,10 @@ void LogToRedfishEventLog::commit(
         "xyz.openbmc_project.Logging", "/xyz/openbmc_project/logging",
         "xyz.openbmc_project.Logging.Create", "Create");
 
-    std::string journalMsg("Discrete condition OnChange of trigger '" +
-                           triggerId + "' is crossed on sensor " + sensorName +
-                           ", recorded value: " + value +
-                           ", timestamp: " + timestampToString(timestamp));
+    std::string journalMsg(
+        "Discrete condition OnChange of trigger '" + triggerId +
+        "' is crossed on sensor " + sensorName + ", recorded value: " + value +
+        ", timestamp: " + timestampToString(timestamp));
 
     AddToLog.append(journalMsg, severity, std::map<std::string, std::string>());
     connection.call(AddToLog);
