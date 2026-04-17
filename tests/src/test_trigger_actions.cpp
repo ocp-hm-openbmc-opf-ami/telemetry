@@ -100,7 +100,8 @@ class TestLogToRedfishEventLogDiscrete : public Test
   public:
     void SetUp()
     {
-        sut = std::make_unique<LogToRedfishEventLog>();
+        sut = std::make_unique<LogToRedfishEventLog>(
+            ::discrete::Severity::ok);
     }
 
     void commit(TriggerValue value) const

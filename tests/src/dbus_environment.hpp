@@ -5,7 +5,9 @@
 
 #include <sdbusplus/asio/object_server.hpp>
 #include <sdbusplus/asio/property.hpp>
+#include <systemd/sd-bus.h>
 
+#include <atomic>
 #include <future>
 #include <thread>
 
@@ -155,4 +157,9 @@ class DbusEnvironment : public ::testing::Environment
     static std::shared_ptr<sdbusplus::asio::object_server> objServer;
     static std::map<std::string, std::vector<std::future<bool>>> futures;
     static bool setUp;
+
+    // Dedicated mock for xyz.openbmc_project.Logging (runs in its own thread
+    // using raw sd_bus to avoid BOOST_ASIO_DISABLE_THREADS constraints)
+    static std::thread loggingThread;
+    static std::atomic<bool> loggingStop;
 };
