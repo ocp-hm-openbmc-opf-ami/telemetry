@@ -3,9 +3,10 @@
 #include "types/duration_types.hpp"
 #include "utils/set_exception.hpp"
 
+#include <systemd/sd-bus.h>
+
 #include <sdbusplus/asio/object_server.hpp>
 #include <sdbusplus/asio/property.hpp>
-#include <systemd/sd-bus.h>
 
 #include <atomic>
 #include <future>
