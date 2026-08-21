@@ -78,3 +78,14 @@ test(
     ),
     timeout: 120,
 )
+
+add_test_setup(
+    'valgrind',
+    exe_wrapper: [
+        'valgrind', '--error-exitcode=1',
+    ],
+    env: [
+        'GTEST_FILTER=-TestDetachedTimer.executesLambdaAfterTimeout',
+    ],
+    timeout_multiplier: 10,
+)

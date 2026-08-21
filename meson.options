@@ -1,4 +1,6 @@
 option('buildtest', type: 'boolean', value: true, description: 'Build tests')
+option('tests', type: 'feature', description: 'Unit Tests')
+
 option(
     'max-reports',
     type: 'integer',
