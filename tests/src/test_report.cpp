@@ -533,6 +533,7 @@ TEST_F(TestReport, deleteReport)
     EXPECT_CALL(*reportManagerMock, removeReport(sut.get()));
     auto ec = deleteReport(sut->getPath());
     EXPECT_THAT(ec, Eq(boost::system::errc::success));
+    DbusEnvironment::synchronizeIoc();
 }
 
 TEST_F(TestReport, deletingNonExistingReportReturnInvalidRequestDescriptor)

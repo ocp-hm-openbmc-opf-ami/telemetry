@@ -34,7 +34,12 @@ boost = dependency('boost', version: boost_version, modules: boost_modules)
 
 nlohmann_json_dep = dependency('nlohmann_json', include_type: 'system')
 phosphor_logging = dependency('phosphor-logging')
-sdbusplus = dependency('sdbusplus')
+if (get_option('tests').enabled())
+	sdbusplus = subproject('sdbusplus').get_variable('sdbusplus_dep')
+else
+	sdbusplus = dependency('sdbusplus')
+endif
+
 systemd = dependency('systemd')
 
 add_project_arguments(
@@ -118,6 +123,6 @@ configure_file(
     install_dir: systemd.get_variable('systemd_system_unit_dir'),
 )
 
-if get_option('buildtest')
+if get_option('buildtest') or get_option('tests').allowed()
     subdir('tests')
 endif
